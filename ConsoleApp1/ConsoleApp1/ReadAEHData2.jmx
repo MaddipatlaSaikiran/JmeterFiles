@@ -1,0 +1,296 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jmeterTestPlan version="1.2" properties="5.0" jmeter="5.1.1 r1855137">
+  <hashTree>
+    <TestPlan guiclass="TestPlanGui" testclass="TestPlan" testname="Test Plan" enabled="true">
+      <stringProp name="TestPlan.comments"></stringProp>
+      <boolProp name="TestPlan.functional_mode">false</boolProp>
+      <boolProp name="TestPlan.tearDown_on_shutdown">true</boolProp>
+      <boolProp name="TestPlan.serialize_threadgroups">false</boolProp>
+      <elementProp name="TestPlan.user_defined_variables" elementType="Arguments" guiclass="ArgumentsPanel" testclass="Arguments" testname="User Defined Variables" enabled="true">
+        <collectionProp name="Arguments.arguments"/>
+      </elementProp>
+      <stringProp name="TestPlan.user_define_classpath"></stringProp>
+    </TestPlan>
+    <hashTree>
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Thread Group" enabled="true">
+        <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
+        <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller" enabled="true">
+          <boolProp name="LoopController.continue_forever">false</boolProp>
+          <stringProp name="LoopController.loops">1</stringProp>
+        </elementProp>
+        <stringProp name="ThreadGroup.num_threads">1</stringProp>
+        <stringProp name="ThreadGroup.ramp_time">1</stringProp>
+        <boolProp name="ThreadGroup.scheduler">false</boolProp>
+        <stringProp name="ThreadGroup.duration"></stringProp>
+        <stringProp name="ThreadGroup.delay"></stringProp>
+      </ThreadGroup>
+      <hashTree>
+        <JSR223Sampler guiclass="TestBeanGUI" testclass="JSR223Sampler" testname="ReadAEHData2" enabled="true">
+          <stringProp name="cacheKey">true</stringProp>
+          <stringProp name="filename"></stringProp>
+          <stringProp name="parameters"></stringProp>
+          <stringProp name="script">import com.microsoft.azure.eventprocessorhost.CloseReason;
+import com.microsoft.azure.eventprocessorhost.EventProcessorHost;
+import com.microsoft.azure.eventprocessorhost.EventProcessorOptions;
+import com.microsoft.azure.eventprocessorhost.ExceptionReceivedEventArgs;
+import com.microsoft.azure.eventprocessorhost.IEventProcessor;
+import com.microsoft.azure.eventprocessorhost.PartitionContext;
+import com.microsoft.azure.proton.transport.proxy.ProxyHandler;
+import com.microsoft.azure.eventhubs.*;
+import com.microsoft.azure.eventhubs.impl.AmqpConstants;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.ExecutionException;
+import java.util.function.Consumer;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import groovy.transform.Field;
+import java.util.concurrent.TimeUnit;
+
+@Field Integer count = 0;
+	String consumerGroupName = &quot;\$Default&quot;;
+    	String namespaceName = &quot;vivify-events-cdc&quot;;
+    	String eventHubName = &quot;deadletter-topic&quot;;
+    	String sasKeyName = &quot;RootManageSharedAccessKey&quot;;
+    	String sasKey = &quot;HmVOqQOyoeJVXmmvU70IiycsEWw1Hh44n2v4NCA2tiM=&quot;;
+    	String storageConnectionString = &quot;DefaultEndpointsProtocol=https;AccountName=testaeh4;AccountKey=m6kU1SXh9g3FfhrC245FD3IUzs8MVQv3bqDB2s+C8LeYpDwHVReDVCF2F32MAIp295syxkAogh9l4E2JYNNbjg==;EndpointSuffix=core.windows.net&quot;;
+    	String storageContainerName = &quot;test&quot;;
+    	String hostNamePrefix = &quot;Test&quot;;
+        String eventHubConnectionString3 = &quot;Endpoint=sb://vivify-events-cdc.servicebus.windows.net/;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=HmVOqQOyoeJVXmmvU70IiycsEWw1Hh44n2v4NCA2tiM=;EntityPath=deadletter-topic;TransportType=AmqpWebSockets&quot;;
+    	EventHubClient ehclient;
+    	List&lt;String&gt; lst=new ArrayList&lt;String&gt;();
+    	//PartitionReceiver offsetReceiver = null;
+    	try {
+    		 
+			 ehclient = EventHubClient.createFromConnectionStringSync(eventHubConnectionString3, Executors.newScheduledThreadPool(1));
+			 EventHubRuntimeInformation runTimeInfo = ehclient.getRuntimeInformation().get();
+    	     int numPartitions = runTimeInfo.getPartitionCount();
+    	     for(int i=0; i&lt;numPartitions; i++)
+    	     {
+    	      String strParti = Integer.toString(i);
+			 PartitionReceiver offsetReceiver = ehclient.createReceiverSync(consumerGroupName, strParti, EventPosition.fromStartOfStream());	
+			 Iterable&lt;EventData&gt; startingEventsUsingOffsetReceiver = null;
+			 try {
+			  startingEventsUsingOffsetReceiver = offsetReceiver.receive(1).get(5000, TimeUnit.MILLISECONDS);
+			 }catch(Exception e) { }
+			 try {				 
+			 while(startingEventsUsingOffsetReceiver.iterator().hasNext())
+				 {
+				 				  
+				  for(EventData data : startingEventsUsingOffsetReceiver)
+					 {
+						 String str = new String(data.getBytes(), &quot;UTF8&quot;);
+						 System.out.println(str);
+						 count = count + 1;
+						 
+						 if(str.contains(&quot;PatientId&quot;)) {
+								String[] AEHSplit = str.split(&quot;,&quot;);
+								String val=AEHSplit[4];
+								String[] split=val.split(&quot;:&quot;);
+								String key=split[0];
+								String value=split[1];
+								//Adding values to Hash Map
+								// hmap.put(key, value);
+								 lst.add(value.toString());
+								
+								}
+								
+			
+					 } 
+				  startingEventsUsingOffsetReceiver = offsetReceiver.receive(1).get(5000, TimeUnit.MILLISECONDS);
+				 }
+			 }catch(Exception e)
+			 {
+				 
+			 }
+			 offsetReceiver.close();
+    	     }
+	//		 Iterable&lt;EventData&gt; startingEventsUsingOffsetReceiver =  offsetReceiver.receive(10).get();
+	//		 offsetReceiver.receive(10).handle((records, throwable) -&gt; handleComplete(offsetReceiver, records, throwable));
+	//		 List&lt;String&gt; list = new ArrayList&lt;String&gt;();
+	//		 List&lt;EventData&gt; myList = Lists.newArrayList(startingEventsUsingOffsetReceiver);
+	/*		 for(EventData data : startingEventsUsingOffsetReceiver)
+			 {
+				 String str = new String(data.getBytes(), &quot;UTF8&quot;);
+				 System.out.println(str);
+		//		 list.add(str);
+			 } */
+		//	 String str2 = Integer.toString(myList.size());
+		//	 System.out.println(str2);
+		//	 offsetReceiver.close();
+		} catch (EventHubException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		 
+    System.out.println(&quot;Num of Lst Msg:&quot;+lst.size());
+    for (String   lstData : lst) {
+    	System.out.println(&quot;List Values Are:&quot;+lstData.toString());
+   	
+	}
+
+	String strCount = Integer.toString(count);
+
+ 	SampleResult.setResponseData(strCount);
+</stringProp>
+          <stringProp name="scriptLanguage">groovy</stringProp>
+        </JSR223Sampler>
+        <hashTree/>
+        <ResultCollector guiclass="ViewResultsFullVisualizer" testclass="ResultCollector" testname="View Results Tree" enabled="true">
+          <boolProp name="ResultCollector.error_logging">false</boolProp>
+          <objProp>
+            <name>saveConfig</name>
+            <value class="SampleSaveConfiguration">
+              <time>true</time>
+              <latency>true</latency>
+              <timestamp>true</timestamp>
+              <success>true</success>
+              <label>true</label>
+              <code>true</code>
+              <message>true</message>
+              <threadName>true</threadName>
+              <dataType>true</dataType>
+              <encoding>false</encoding>
+              <assertions>true</assertions>
+              <subresults>true</subresults>
+              <responseData>false</responseData>
+              <samplerData>false</samplerData>
+              <xml>false</xml>
+              <fieldNames>true</fieldNames>
+              <responseHeaders>false</responseHeaders>
+              <requestHeaders>false</requestHeaders>
+              <responseDataOnError>false</responseDataOnError>
+              <saveAssertionResultsFailureMessage>true</saveAssertionResultsFailureMessage>
+              <assertionsResultsToSave>0</assertionsResultsToSave>
+              <bytes>true</bytes>
+              <sentBytes>true</sentBytes>
+              <url>true</url>
+              <threadCounts>true</threadCounts>
+              <idleTime>true</idleTime>
+              <connectTime>true</connectTime>
+            </value>
+          </objProp>
+          <stringProp name="filename"></stringProp>
+        </ResultCollector>
+        <hashTree/>
+        <ResultCollector guiclass="SummaryReport" testclass="ResultCollector" testname="Summary Report" enabled="true">
+          <boolProp name="ResultCollector.error_logging">false</boolProp>
+          <objProp>
+            <name>saveConfig</name>
+            <value class="SampleSaveConfiguration">
+              <time>true</time>
+              <latency>true</latency>
+              <timestamp>true</timestamp>
+              <success>true</success>
+              <label>true</label>
+              <code>true</code>
+              <message>true</message>
+              <threadName>true</threadName>
+              <dataType>true</dataType>
+              <encoding>false</encoding>
+              <assertions>true</assertions>
+              <subresults>true</subresults>
+              <responseData>false</responseData>
+              <samplerData>false</samplerData>
+              <xml>false</xml>
+              <fieldNames>true</fieldNames>
+              <responseHeaders>false</responseHeaders>
+              <requestHeaders>false</requestHeaders>
+              <responseDataOnError>false</responseDataOnError>
+              <saveAssertionResultsFailureMessage>true</saveAssertionResultsFailureMessage>
+              <assertionsResultsToSave>0</assertionsResultsToSave>
+              <bytes>true</bytes>
+              <sentBytes>true</sentBytes>
+              <url>true</url>
+              <threadCounts>true</threadCounts>
+              <idleTime>true</idleTime>
+              <connectTime>true</connectTime>
+            </value>
+          </objProp>
+          <stringProp name="filename"></stringProp>
+        </ResultCollector>
+        <hashTree/>
+        <ResultCollector guiclass="GraphVisualizer" testclass="ResultCollector" testname="Graph Results" enabled="true">
+          <boolProp name="ResultCollector.error_logging">false</boolProp>
+          <objProp>
+            <name>saveConfig</name>
+            <value class="SampleSaveConfiguration">
+              <time>true</time>
+              <latency>true</latency>
+              <timestamp>true</timestamp>
+              <success>true</success>
+              <label>true</label>
+              <code>true</code>
+              <message>true</message>
+              <threadName>true</threadName>
+              <dataType>true</dataType>
+              <encoding>false</encoding>
+              <assertions>true</assertions>
+              <subresults>true</subresults>
+              <responseData>false</responseData>
+              <samplerData>false</samplerData>
+              <xml>false</xml>
+              <fieldNames>true</fieldNames>
+              <responseHeaders>false</responseHeaders>
+              <requestHeaders>false</requestHeaders>
+              <responseDataOnError>false</responseDataOnError>
+              <saveAssertionResultsFailureMessage>true</saveAssertionResultsFailureMessage>
+              <assertionsResultsToSave>0</assertionsResultsToSave>
+              <bytes>true</bytes>
+              <sentBytes>true</sentBytes>
+              <url>true</url>
+              <threadCounts>true</threadCounts>
+              <idleTime>true</idleTime>
+              <connectTime>true</connectTime>
+            </value>
+          </objProp>
+          <stringProp name="filename"></stringProp>
+        </ResultCollector>
+        <hashTree/>
+        <ResultCollector guiclass="StatVisualizer" testclass="ResultCollector" testname="Aggregate Report" enabled="true">
+          <boolProp name="ResultCollector.error_logging">false</boolProp>
+          <objProp>
+            <name>saveConfig</name>
+            <value class="SampleSaveConfiguration">
+              <time>true</time>
+              <latency>true</latency>
+              <timestamp>true</timestamp>
+              <success>true</success>
+              <label>true</label>
+              <code>true</code>
+              <message>true</message>
+              <threadName>true</threadName>
+              <dataType>true</dataType>
+              <encoding>false</encoding>
+              <assertions>true</assertions>
+              <subresults>true</subresults>
+              <responseData>false</responseData>
+              <samplerData>false</samplerData>
+              <xml>false</xml>
+              <fieldNames>true</fieldNames>
+              <responseHeaders>false</responseHeaders>
+              <requestHeaders>false</requestHeaders>
+              <responseDataOnError>false</responseDataOnError>
+              <saveAssertionResultsFailureMessage>true</saveAssertionResultsFailureMessage>
+              <assertionsResultsToSave>0</assertionsResultsToSave>
+              <bytes>true</bytes>
+              <sentBytes>true</sentBytes>
+              <url>true</url>
+              <threadCounts>true</threadCounts>
+              <idleTime>true</idleTime>
+              <connectTime>true</connectTime>
+            </value>
+          </objProp>
+          <stringProp name="filename"></stringProp>
+        </ResultCollector>
+        <hashTree/>
+      </hashTree>
+    </hashTree>
+  </hashTree>
+</jmeterTestPlan>
